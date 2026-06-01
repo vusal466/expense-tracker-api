@@ -1,17 +1,16 @@
 # Expense Tracker API
 
-A backend REST API for real-time personal and business expense tracking. Built with Java 17, Spring Boot, and PostgreSQL. Designed with a clean architecture that makes future AI-powered categorization easy to integrate.
+A backend REST API for personal and business expense tracking with **AI-powered automatic categorization**. Built with Java, Spring Boot, and a Python ML microservice.
 
 ---
 
 ## Features
 
-- **Transaction Logging** — Record income and expense transactions with category, amount, date, and description
-- **Statistical Analysis** — Aggregate spending by category, time period, or custom filters using SQL aggregations
-- **Category Management** — Create custom expense categories and assign transactions accordingly
+- **Transaction Logging** — Record income and expense transactions with category, amount, and date
+- **ML Auto-Categorization** — Automatically classifies expenses using a Python ML microservice (TF-IDF + Logistic Regression)
+- **Statistical Analysis** — Aggregate spending by category, time period, or custom filters
 - **Monthly/Weekly Reports** — Query spending summaries over any date range
-- **JWT Authentication** — Each user manages their own isolated transaction data
-- **AI-Ready Architecture** — Data model and API structure designed for easy integration of ML-based auto-categorization
+- **Docker Support** — Full stack runs with a single `docker compose up`
 
 ---
 
@@ -19,12 +18,68 @@ A backend REST API for real-time personal and business expense tracking. Built w
 
 | Layer | Technology |
 |---|---|
-| Language | Java 17 |
-| Framework | Spring Boot 3 |
-| Database | PostgreSQL |
+| Language | Java 17, Python 3.12 |
+| Framework | Spring Boot 4, Flask |
+| ML | Scikit-learn (TF-IDF + Logistic Regression) |
+| Database | MySQL 8 |
 | ORM | JPA / Hibernate |
-| Auth | JWT |
 | Build | Gradle |
+| DevOps | Docker, Docker Compose |
+
+---
+
+## Architecture
+
+```
+POST /expenses/save
+      ↓
+Spring Boot (Java)
+      ↓
+Python ML Microservice → predicts category from title
+      ↓
+MySQL Database
+```
+
+When a user submits an expense without a category, Spring Boot calls the Python ML service which predicts the category automatically based on the expense title.
+
+---
+
+## ML Microservice
+
+Located in `ml-service/` — a standalone Flask app that exposes a `/predict` endpoint.
+
+**How it works:**
+- Input: expense title (e.g. `"taxi to airport"`)
+- Model: TF-IDF vectorizer + Logistic Regression pipeline
+- Output: predicted category + confidence score
+
+**Supported categories:** `FOOD`, `TRANSPORT`, `RENT`, `SHOPPING`, `OTHER`
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"title": "taxi to airport"}'
+```
+
+```json
+{
+  "title": "taxi to airport",
+  "category": "TRANSPORT",
+  "confidence": 0.9821
+}
+```
+
+**Prediction examples:**
+
+| Title | Predicted Category |
+|---|---|
+| taxi to airport | TRANSPORT |
+| grocery shopping | FOOD |
+| monthly rent payment | RENT |
+| new shoes nike | SHOPPING |
+| netflix subscription | OTHER |
 
 ---
 
@@ -33,121 +88,98 @@ A backend REST API for real-time personal and business expense tracking. Built w
 ### Prerequisites
 
 - Java 17+
-- PostgreSQL 14+
-- Gradle
+- Python 3.12+
+- MySQL 8+
+- Docker (optional)
 
-### Setup
+### Run locally
 
+**1. Clone the repo:**
 ```bash
 git clone https://github.com/vusal466/expense-tracker-api.git
 cd expense-tracker-api
 ```
 
-Configure your database in `src/main/resources/application.properties`:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/expense_db
-spring.datasource.username=your_username
-spring.datasource.password=your_password
+**2. Set up environment variables:**
+```bash
+cp .env.example .env
+# Edit .env with your values
 ```
 
-Run:
+**3. Start ML service:**
+```bash
+cd ml-service
+pip install flask scikit-learn numpy
+python app.py
+```
 
+**4. Start Spring Boot:**
 ```bash
 ./gradlew bootRun
 ```
 
-API available at `http://localhost:8080`
+API available at `http://localhost:8080/swagger-ui/index.html`
+
+---
+
+### Run with Docker
+
+```bash
+docker compose up --build
+```
+
+All services start automatically: MySQL, Python ML service, Spring Boot.
 
 ---
 
 ## API Endpoints
 
-### Auth
-
 ```
-POST /api/auth/register      - Register new user
-POST /api/auth/login         - Login, receive JWT
-```
-
-### Transactions
-
-```
-GET    /api/transactions              - List all transactions (with filters)
-POST   /api/transactions              - Add new transaction
-GET    /api/transactions/{id}         - Get transaction detail
-PUT    /api/transactions/{id}         - Update transaction
-DELETE /api/transactions/{id}         - Delete transaction
-```
-
-Query parameters for filtering:
-
-```
-?category=food
-?startDate=2026-01-01&endDate=2026-01-31
-?type=EXPENSE  (or INCOME)
-```
-
-### Analytics
-
-```
-GET /api/analytics/summary            - Total income vs expenses
-GET /api/analytics/by-category        - Spending breakdown by category
-GET /api/analytics/monthly            - Month-over-month comparison
-```
-
-### Categories
-
-```
-GET    /api/categories                - List categories
-POST   /api/categories                - Create category
-DELETE /api/categories/{id}           - Delete category
+POST   /expenses/save         - Add expense (category auto-predicted by ML)
+GET    /expenses/all          - List all expenses
+GET    /expenses/{id}         - Get expense by ID
+PUT    /expenses/update/{id}  - Update expense
+DELETE /expenses/delete/{id}  - Delete expense
+GET    /expenses/date/{date}  - Get expenses by date
+GET    /expenses/summary      - Income vs expense summary
+GET    /expenses/total        - Total expenses between dates
 ```
 
 ---
 
-## Data Model
-
-```
-User
-  └── Transactions (1:N)
-        └── Category (N:1)
-```
-
-Example transaction payload:
+## Example Request
 
 ```json
+POST /expenses/save
+
 {
-  "amount": 45.00,
-  "type": "EXPENSE",
-  "category": "food",
-  "description": "Lunch",
-  "date": "2026-05-15"
+  "title": "taxi to airport",
+  "amount": 15.0,
+  "type": "EXPENSE"
 }
 ```
 
----
-
-## Analytics Example
-
-`GET /api/analytics/by-category?startDate=2026-01-01&endDate=2026-01-31`
-
 ```json
-[
-  { "category": "food",          "total": 320.00 },
-  { "category": "transport",     "total": 85.50  },
-  { "category": "entertainment", "total": 60.00  }
-]
+{
+  "id": 1,
+  "title": "taxi to airport",
+  "amount": 15.0,
+  "type": "EXPENSE",
+  "category": "TRANSPORT",
+  "date": "2026-05-31"
+}
 ```
+
+Category is automatically predicted — no need to send it manually.
 
 ---
 
 ## Future Improvements
 
-- [ ] ML model integration for automatic transaction categorization
+- [ ] Retrain ML model with user feedback
 - [ ] Budget alerts — notify when spending exceeds set limits
 - [ ] CSV export for transactions
-- [ ] Docker support
+- [ ] JWT Authentication
 
 ---
 
@@ -155,3 +187,4 @@ Example transaction payload:
 
 **Vusal Jafarli** — Java Backend Developer
 - GitHub: [@vusal466](https://github.com/vusal466)
+- LinkedIn: [vusaljafarli](https://linkedin.com/in/vusaljafarli)
