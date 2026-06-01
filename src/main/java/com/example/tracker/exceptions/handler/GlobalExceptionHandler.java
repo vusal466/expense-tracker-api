@@ -3,7 +3,6 @@ package com.example.tracker.exceptions.handler;
 import com.example.tracker.exceptions.NotFoundException;
 import com.example.tracker.model.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;

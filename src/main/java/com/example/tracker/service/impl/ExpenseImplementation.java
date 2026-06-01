@@ -1,6 +1,7 @@
 package com.example.tracker.service.impl;
 
 import com.example.tracker.entity.Expense;
+import com.example.tracker.enums.ExpenseCategory;
 import com.example.tracker.enums.ExpenseType;
 import com.example.tracker.exceptions.NotFoundException;
 import com.example.tracker.mapper.ExpenseMapper;
@@ -21,14 +22,21 @@ public class ExpenseImplementation implements ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final  ExpenseMapper expenseMapper;
+    private final MlCategoryService mlCategoryService;
 
 
 
     @Override
     public ExpenseResponse save(ExpenseRequest request) {
-        Expense expense1 = expenseMapper.toEntity(request);
+        Expense expense = expenseMapper.toEntity(request);
 
-        Expense saved = expenseRepository.save(expense1);
+
+        if (expense.getCategory() == null) {
+            ExpenseCategory predicted = mlCategoryService.predict(request.getTitle());
+            expense.setCategory(predicted);
+        }
+
+        Expense saved = expenseRepository.save(expense);
 
         return expenseMapper.toResponse(saved);
     }
@@ -60,10 +68,14 @@ public class ExpenseImplementation implements ExpenseService {
 
         expenseMapper.updateEntity(expenseRequest,expense);
 
+        if (expense.getCategory() == null) {
+            ExpenseCategory predicted = mlCategoryService.predict(expenseRequest.getTitle());
+            expense.setCategory(predicted);
+        }
+
         Expense saved =  expenseRepository.save(expense);
 
         return expenseMapper.toResponse(saved);
-
     }
 
     @Override

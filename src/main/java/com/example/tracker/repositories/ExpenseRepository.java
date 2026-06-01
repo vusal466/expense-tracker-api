@@ -2,12 +2,9 @@ package com.example.tracker.repositories;
 
 import com.example.tracker.entity.Expense;
 import com.example.tracker.enums.ExpenseType;
-import com.example.tracker.model.request.ExpenseRequest;
-import com.example.tracker.model.response.ExpenseResponse;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
