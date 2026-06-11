@@ -11,6 +11,7 @@ public class ExpenseResponse {
 
     private Long id;
     private String title;
+    private Double amount;
     private ExpenseType type;
     private ExpenseCategory category;
     private LocalDate date;
