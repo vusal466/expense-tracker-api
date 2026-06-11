@@ -1,6 +1,6 @@
 # Expense Tracker API
 
-A backend REST API for personal and business expense tracking with **AI-powered automatic categorization**. Built with Java, Spring Boot, and a Python ML microservice.
+A backend REST API for personal and business expense tracking with **AI-powered automatic categorization** and a **natural language chatbot** for financial analysis. Built with Java, Spring Boot, Python, LangChain, and Ollama.
 
 ---
 
@@ -8,6 +8,7 @@ A backend REST API for personal and business expense tracking with **AI-powered 
 
 - **Transaction Logging** — Record income and expense transactions with category, amount, and date
 - **ML Auto-Categorization** — Automatically classifies expenses using a Python ML microservice (TF-IDF + Logistic Regression)
+- **AI Chatbot** — Ask natural language questions about your expenses ("How much did I spend in June?", "What are my biggest expenses?")
 - **Statistical Analysis** — Aggregate spending by category, time period, or custom filters
 - **Monthly/Weekly Reports** — Query spending summaries over any date range
 - **Docker Support** — Full stack runs with a single `docker compose up`
@@ -21,6 +22,7 @@ A backend REST API for personal and business expense tracking with **AI-powered 
 | Language | Java 17, Python 3.12 |
 | Framework | Spring Boot 4, Flask |
 | ML | Scikit-learn (TF-IDF + Logistic Regression) |
+| AI Chatbot | LangChain, Ollama, qwen2.5:7b |
 | Database | MySQL 8 |
 | ORM | JPA / Hibernate |
 | Build | Gradle |
@@ -38,9 +40,17 @@ Spring Boot (Java)
 Python ML Microservice → predicts category from title
       ↓
 MySQL Database
+
+POST /chat
+      ↓
+Spring Boot (Java)
+      ↓
+Python Chat Microservice (LangChain + Ollama)
+      ↓
+Fetches expenses from Spring Boot → formats data → LLM generates answer
 ```
 
-When a user submits an expense without a category, Spring Boot calls the Python ML service which predicts the category automatically based on the expense title.
+When a user submits an expense without a category, Spring Boot calls the Python ML service which predicts the category automatically. For chat queries, the chatbot fetches live expense data, pre-calculates totals in Python, and uses a local LLM (via Ollama) to generate a human-readable answer.
 
 ---
 
@@ -83,7 +93,51 @@ curl -X POST http://localhost:5000/predict \
 
 ---
 
-## Getting Started
+## AI Chatbot (chat-service)
+
+Located in `chat-service/` — a Flask app powered by LangChain and Ollama for natural language financial queries.
+
+**How it works:**
+1. User asks a question in natural language
+2. Python fetches live expense data from Spring Boot
+3. Pre-calculates totals, breakdowns, and statistics
+4. Local LLM (qwen2.5:7b via Ollama) generates a human-readable answer
+
+**Example questions:**
+
+| Question | Answer |
+|---|---|
+| "How much did I spend in June?" | Total with monthly breakdown |
+| "What was my biggest expense?" | Top expenses per day |
+| "How much did I spend on food?" | Category total |
+| "How can I reduce my expenses?" | Financial advice based on data |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:5001/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How much did I spend in June?"}'
+```
+
+```json
+{
+  "question": "How much did I spend in June?",
+  "answer": "Your total expense in June 2026 was $3,212.50...",
+  "expense_count": 24
+}
+```
+
+**Also accessible via Spring Boot:**
+
+```
+POST /chat
+{
+  "question": "How much did I spend on food this month?"
+}
+```
+
+---
 
 ### Prerequisites
 
@@ -113,7 +167,14 @@ pip install flask scikit-learn numpy
 python app.py
 ```
 
-**4. Start Spring Boot:**
+**4. Start Chat service:**
+```bash
+cd chat-service
+pip install flask langchain langchain-ollama langchain-community
+python app.py
+```
+
+**5. Start Spring Boot:**
 ```bash
 ./gradlew bootRun
 ```
@@ -128,7 +189,9 @@ API available at `http://localhost:8080/swagger-ui/index.html`
 docker compose up --build
 ```
 
-All services start automatically: MySQL, Python ML service, Spring Boot.
+All services start automatically: MySQL, Python ML service, Chat service, Spring Boot.
+
+> **Note:** Ollama must be running on your host machine before starting Docker. The chat service connects to Ollama via `host.docker.internal:11434`.
 
 ---
 
@@ -143,6 +206,7 @@ DELETE /expenses/delete/{id}  - Delete expense
 GET    /expenses/date/{date}  - Get expenses by date
 GET    /expenses/summary      - Income vs expense summary
 GET    /expenses/total        - Total expenses between dates
+POST   /chat                  - Ask natural language questions about expenses
 ```
 
 ---
@@ -176,10 +240,12 @@ Category is automatically predicted — no need to send it manually.
 
 ## Future Improvements
 
-- [ ] Retrain ML model with user feedback
 - [ ] Budget alerts — notify when spending exceeds set limits
-- [ ] CSV export for transactions
+- [ ] Spending predictions — forecast next month's expenses with ML
+- [ ] PDF report generation — monthly expense reports
+- [ ] Retrain ML model with user feedback
 - [ ] JWT Authentication
+- [ ] RAG Document Assistant
 
 ---
 
